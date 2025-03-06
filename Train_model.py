@@ -8,22 +8,27 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 # 配置参数
 class Config:
-    TICKER_LIST = ["sh601138"]  # 示例股票代码
+    TICKER_LIST = ["sh601138","sz000938","sh600050","sz000977","sh603259",
+                   "sh603019","sh600415","sz002230","sh603501","sh601336",
+                   "sz002475","sz300124","sh601766","sh601628","sz000002",
+                   "sz002304","sz002241","sh601888","sz002466","sz000725",
+                   "sh601633","sh601012","sh600150","sh601989","sz000100",
+                   "sh601919","sh600111","sh600010","sh601939","sh601398"]  # 示例股票代码
     TECHNICAL_INDICATORS = ['macd', 'rsi_30', 'boll_ub', 'boll_lb']
     TIME_INTERVAL = "daily"
     DATA_SAVE_DIR = "./datasets"
     TRAINED_MODEL_DIR = "./trained_models"
     RESULTS_DIR = "./results"
     INITIAL_AMOUNT = 1000000
-    BUY_COST_PCT = [0.000687]
-    SELL_COST_PCT = [0.0010687]
+    BUY_COST_PCT = [0.0005, 0.0006, 0.0004]  # 每只股票的买入手续费
+    SELL_COST_PCT = [0.0005, 0.0006, 0.0004]  # 每只股票的卖出手续费
 
     # 获取股票数据起止日
     STOCK_START_DATE = "20230101"
     STOCK_END_DATE = "20250219"
 
-    TRAIN_START_DATE = "20230101"
-    TRADE_END_DATE = "20250219"
+    TRAIN_START_DATE = "20130121"
+    TRAIN_END_DATE = "20240219"
 
 
 # 主流程
@@ -40,11 +45,10 @@ def main():
         "换手率": "turnover_rate",
     })
 
-    processed_df["date"] = pd.to_datetime(processed_df["date"], format="%Y-%m-%d")
     processed_df.fillna(0, inplace=True)
     # 创建训练集时使用 datetime.date 对象进行比较
     train_start_date = pd.to_datetime(Config.TRAIN_START_DATE, format="%Y%m%d")
-    trade_end_date = pd.to_datetime(Config.TRADE_END_DATE, format="%Y%m%d")
+    trade_end_date = pd.to_datetime(Config.TRAIN_END_DATE, format="%Y%m%d")
 
 
     train_df = processed_df[
@@ -77,100 +81,100 @@ def main():
     agent = DRLAgent(env=env_train)
 
     if_using_a2c = True  # 年化率 3.06%
-    if_using_ddpg = True # 年化率 5.77%
-    if_using_ppo = True
-    if_using_td3 = True
-    if_using_sac = True  # 年化率19%
+    if_using_ddpg = False # 年化率 5.77%
+    if_using_ppo = False
+    if_using_td3 = False
+    if_using_sac = False  # 年化率19%
     ################################# A2C #################################
-    model_a2c = agent.get_model("a2c")
     if if_using_a2c:
+        model_a2c = agent.get_model("a2c")
         # set up logger
         tmp_path = Config.RESULTS_DIR + '/a2c'
         new_logger_a2c = configure(tmp_path, ["stdout", "csv", "tensorboard"])
         # Set new logger
         model_a2c.set_logger(new_logger_a2c)
 
-    trained_a2c = agent.train_model(model=model_a2c,
-                                    tb_log_name='a2c',
-                                    total_timesteps=50000) if if_using_a2c else None
-    trained_a2c.save(Config.TRAINED_MODEL_DIR + "/agent_a2c") if if_using_a2c else None
+        trained_a2c = agent.train_model(model=model_a2c,
+                                        tb_log_name='a2c',
+                                        total_timesteps=50000) if if_using_a2c else None
+        trained_a2c.save(Config.TRAINED_MODEL_DIR + "/agent_a2c") if if_using_a2c else None
     ################################# DDPG #################################
-    model_ddpg = agent.get_model("ddpg")
     if if_using_ddpg:
+        model_ddpg = agent.get_model("ddpg")
         # set up logger
         tmp_path = Config.RESULTS_DIR + '/ddpg'
         new_logger_ddpg = configure(tmp_path, ["stdout", "csv", "tensorboard"])
         # Set new logger
         model_ddpg.set_logger(new_logger_ddpg)
 
-    trained_ddpg = agent.train_model(model=model_ddpg,
+        trained_ddpg = agent.train_model(model=model_ddpg,
                                      tb_log_name='ddpg',
                                      total_timesteps=50000) if if_using_ddpg else None
-    trained_ddpg.save(Config.TRAINED_MODEL_DIR + "/agent_ddpg") if if_using_ddpg else None
+        trained_ddpg.save(Config.TRAINED_MODEL_DIR + "/agent_ddpg") if if_using_ddpg else None
 
     ################################# PPO #################################
-    PPO_PARAMS = {
-        "n_steps": 2048,
-        "ent_coef": 0.01,
-        "learning_rate": 0.00025,
-        "batch_size": 64,
-    }
-    model_ppo = agent.get_model("ppo", model_kwargs=PPO_PARAMS)
 
     if if_using_ppo:
+        PPO_PARAMS = {
+            "n_steps": 2048,
+            "ent_coef": 0.01,
+            "learning_rate": 0.00025,
+            "batch_size": 64,
+        }
+        model_ppo = agent.get_model("ppo", model_kwargs=PPO_PARAMS)
         # set up logger
         tmp_path = Config.RESULTS_DIR + '/ppo'
         new_logger_ppo = configure(tmp_path, ["stdout", "csv", "tensorboard"])
         # Set new logger
         model_ppo.set_logger(new_logger_ppo)
 
-    trained_ppo = agent.train_model(
-        model=model_ppo,
-        tb_log_name="ppo",
-        total_timesteps=100000
-    )
-    trained_ppo.save(os.path.join(Config.TRAINED_MODEL_DIR, "ppo_akshare"))
+        trained_ppo = agent.train_model(
+            model=model_ppo,
+            tb_log_name="ppo",
+            total_timesteps=100000
+        )
+        trained_ppo.save(os.path.join(Config.TRAINED_MODEL_DIR, "ppo_akshare"))
     ################################# TD3 #################################
-    TD3_PARAMS = {"batch_size": 100,
-                  "buffer_size": 1000000,
-                  "learning_rate": 0.001}
-
-    model_td3 = agent.get_model("td3", model_kwargs=TD3_PARAMS)
 
     if if_using_td3:
+        TD3_PARAMS = {"batch_size": 100,
+                      "buffer_size": 1000000,
+                      "learning_rate": 0.001}
+        model_td3 = agent.get_model("td3", model_kwargs=TD3_PARAMS)
+
         # set up logger
         tmp_path = Config.RESULTS_DIR + '/td3'
         new_logger_td3 = configure(tmp_path, ["stdout", "csv", "tensorboard"])
         # Set new logger
         model_td3.set_logger(new_logger_td3)
 
-    trained_td3 = agent.train_model(model=model_td3,
+        trained_td3 = agent.train_model(model=model_td3,
                                     tb_log_name='td3',
                                     total_timesteps=50000) if if_using_td3 else None
-    trained_td3.save(Config.TRAINED_MODEL_DIR + "/agent_td3") if if_using_td3 else None
+        trained_td3.save(Config.TRAINED_MODEL_DIR + "/agent_td3") if if_using_td3 else None
 
     ################################# SAC #################################
-    SAC_PARAMS = {
-        "batch_size": 128,
-        "buffer_size": 100000,
-        "learning_rate": 0.0001,
-        "learning_starts": 100,
-        "ent_coef": "auto_0.1",
-    }
-
-    model_sac = agent.get_model("sac", model_kwargs=SAC_PARAMS)
 
     if if_using_sac:
+        SAC_PARAMS = {
+            "batch_size": 128,
+            "buffer_size": 100000,
+            "learning_rate": 0.0001,
+            "learning_starts": 100,
+            "ent_coef": "auto_0.1",
+        }
+        model_sac = agent.get_model("sac", model_kwargs=SAC_PARAMS)
+
         # set up logger
         tmp_path = Config.RESULTS_DIR + '/sac'
         new_logger_sac = configure(tmp_path, ["stdout", "csv", "tensorboard"])
         # Set new logger
         model_sac.set_logger(new_logger_sac)
 
-    trained_sac = agent.train_model(model=model_sac,
+        trained_sac = agent.train_model(model=model_sac,
                              tb_log_name='sac',
                              total_timesteps=70000) if if_using_sac else None
-    trained_sac.save(Config.TRAINED_MODEL_DIR + "/agent_sac") if if_using_sac else None
+        trained_sac.save(Config.TRAINED_MODEL_DIR + "/agent_sac") if if_using_sac else None
 
 
 if __name__ == "__main__":

@@ -1,15 +1,33 @@
+import matplotlib
 import pandas as pd
 import data_loader as dl
 from stable_baselines3 import A2C, DDPG, PPO, SAC, TD3
 from finrl.agents.stablebaselines3.models import DRLAgent
-from finrl.config import INDICATORS, TRAINED_MODEL_DIR
 from finrl.meta.env_stock_trading.env_stocktrading import StockTradingEnv
-from finrl.meta.preprocessor.yahoodownloader import YahooDownloader
 import numpy as np
-from pypfopt.efficient_frontier import EfficientFrontier
+import matplotlib.pyplot as plt
+matplotlib.use('TkAgg')
 
 trade = pd.read_csv('./datasets/trade_data.csv') # 交易数据
 train = pd.read_csv('./datasets/train_data.csv') # 训练数据
+
+# 统一列名
+trade = trade.rename(columns={
+    "成交额": "turnover",
+    "振幅": "amplitude",
+    "涨跌幅": "pct_change",
+    "涨跌额": "price_change",
+    "换手率": "turnover_rate",
+})
+train = train.rename(columns={
+    "成交额": "turnover",
+    "振幅": "amplitude",
+    "涨跌幅": "pct_change",
+    "涨跌额": "price_change",
+    "换手率": "turnover_rate",
+})
+
+
 
 train = train.set_index(train.columns[0])
 train.index.names = ['']
@@ -48,7 +66,7 @@ env_kwargs = {
     "reward_scaling": 1e-4
 }
 
-e_trade_gym = StockTradingEnv(df = trade, turbulence_threshold = 70,risk_indicator_col='vix', **env_kwargs)
+e_trade_gym = StockTradingEnv(df = trade, turbulence_threshold = 5,risk_indicator_col='amplitude', **env_kwargs)
 
 df_account_value_a2c, df_actions_a2c = DRLAgent.DRL_prediction(
     model=trained_a2c,
@@ -103,16 +121,16 @@ np.set_printoptions(precision=3, suppress=True)
 print('Mean returns of assets in k-portfolio 1\n', meanReturns)
 print('Variance-Covariance matrix of returns\n', covReturns)
 
-ef_mean = EfficientFrontier(meanReturns, covReturns, weight_bounds=(0, 0.5))
-raw_weights_mean = ef_mean.max_sharpe()
-cleaned_weights_mean = ef_mean.clean_weights()
-mvo_weights = np.array([1000000 * cleaned_weights_mean[i] for i in range(len(cleaned_weights_mean))])
-
-LastPrice = np.array([1/p for p in StockData.tail(1).to_numpy()[0]])
-Initial_Portfolio = np.multiply(mvo_weights, LastPrice)
-
-Portfolio_Assets = TradeData @ Initial_Portfolio
-MVO_result = pd.DataFrame(Portfolio_Assets, columns=["Mean Var"])
+# ef_mean = EfficientFrontier(meanReturns, covReturns, weight_bounds=(0, 0.5))
+# raw_weights_mean = ef_mean.max_sharpe()
+# cleaned_weights_mean = ef_mean.clean_weights()
+# mvo_weights = np.array([1000000 * cleaned_weights_mean[i] for i in range(len(cleaned_weights_mean))])
+#
+# LastPrice = np.array([1/p for p in StockData.tail(1).to_numpy()[0]])
+# Initial_Portfolio = np.multiply(mvo_weights, LastPrice)
+#
+# Portfolio_Assets = TradeData @ Initial_Portfolio
+# MVO_result = pd.DataFrame(Portfolio_Assets, columns=["Mean Var"])
 
 processor = dl.AkshareProcessor(config=dl.Config())
 
@@ -165,8 +183,23 @@ result = pd.DataFrame(
         "ppo": df_result_ppo["account_value"] if if_using_ppo else None,
         "td3": df_result_td3["account_value"] if if_using_td3 else None,
         "sac": df_result_sac["account_value"] if if_using_sac else None,
-        "mvo": MVO_result["Mean Var"],
-        "dji": dji["close"],
     }
 )
-print(result)
+
+# 删除全为NaN的列（未启用的模型）
+result = result.dropna(axis=1, how='all')
+
+# 打印数据验证
+print("数据前5行:\n", result.head())
+print("数据统计:\n", result.describe())
+# 绘图设置
+plt.rcParams["figure.figsize"] = (15, 5)
+plt.figure()
+result.plot(
+    title="sh601138",
+    xlabel="Date",
+    ylabel="Account (USD)",
+    grid=True
+)
+plt.tight_layout()
+plt.show()
